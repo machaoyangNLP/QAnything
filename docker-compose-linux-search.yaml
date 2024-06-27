@@ -3,7 +3,7 @@ version: '3.5'
 services:
   elasticsearch:
     container_name: es-container-local
-    image: "docker.elastic.co/elasticsearch/elasticsearch:8.11.4"
+    image: "elasticsearch/elasticsearch:8.11.4"
     privileged: true
     # ports:
     #   - 9200:9200
@@ -97,39 +97,68 @@ services:
       - MYSQL_ROOT_PASSWORD=123456
     volumes:
       - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/mysql:/var/lib/mysql
+  
+  # qanything_local:
+  #   container_name: qanything-container-local
+  #   image: freeren/qanything:v1.2.2
+  #   # runtime: nvidia
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: "all"
+  #             capabilities: ["gpu"]
+
+  #   command: /bin/bash -c /workspace/qanything_local/scripts/run_for_embedding_search.sh -i $DEVICE_ID; while true; do sleep 5; done'
+
+  #   privileged: true
+  #   shm_size: '8gb'
+  #   volumes:
+  #     - ${DOCKER_VOLUME_DIRECTORY:-.}/:/workspace/qanything_local/
+  #   ports:
+  #     - "8666:8666"
+  #   environment:
+  #     - NCCL_LAUNCH_MODE=PARALLEL
+  #     - GPUID1=${GPUID1:-0}
+  #     - GPUID2=${GPUID2:-0}
+  #     - USER_IP=${USER_IP:-localhost}
+  #   depends_on:
+  #     - "standalone"
+  #     - "mysql"
+  #     - "elasticsearch"
+  #   tty: true
+  #   stdin_open: true
 
 
-  qanything_local:
-    container_name: qanything-container-local
-    image: freeren/qanything:v1.2.2
-    # runtime: nvidia
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: "all"
-              capabilities: ["gpu"]
-
-    command: /bin/bash -c /workspace/qanything_local/scripts/run_for_embedding_search.sh -i $DEVICE_ID; while true; do sleep 5; done'
-
-    privileged: true
-    shm_size: '8gb'
-    volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/:/workspace/qanything_local/
-    ports:
-      - "8666:8666"
-    environment:
-      - NCCL_LAUNCH_MODE=PARALLEL
-      - GPUID1=${GPUID1:-0}
-      - GPUID2=${GPUID2:-0}
-      - USER_IP=${USER_IP:-localhost}
+  qanything_local:  
+    image: qanything/ascend:v1  
+    container_name: qanything_docker
+    tty: true # 对应 -it  
+    ports:  
+      - "8666:8666"  
+    shm_size: 500g
+    privileged: true  
+    working_dir: /workspace/qanything_local  
+    devices:  
+      - /dev/davinci_manager:/dev/davinci_manager  
+      - /dev/hisi_hdc:/dev/hisi_hdc  
+      - /dev/devmm_svm:/dev/devmm_svm  
+    volumes:  
+      - /usr/local/Ascend/driver:/usr/local/Ascend/driver  
+      - /usr/local/dcmi:/usr/local/dcmi  
+      - /usr/local/bin/npu-smi:/usr/local/bin/npu-smi  
+      - /usr/local/sbin:/usr/local/sbin  
+      - /tmp:/tmp  
+      - /usr/share/zoneinfo/Asia/Shanghai:/etc/localtime:ro  
+      - /data/nv1/RAG/QAnything-search:/workspace/qanything_local  
+    command: /workspace/qanything_local/scripts/run_for_embedding_search.sh -d npu
     depends_on:
       - "standalone"
       - "mysql"
       - "elasticsearch"
-    tty: true
     stdin_open: true
+
 
 networks:
   default:

@@ -15,11 +15,11 @@ import re
 from datetime import datetime
 import os
 import time
-import markdown
+from tqdm import tqdm
 from save_apicsv import *
 
 __all__ = ["list_kbs","list_docs","new_knowledge_base","document_parser", "document_parser_embedding", "chunk_embedding", "delete_knowledge_base", 
-           "get_files_statu", "question_rag_search", "document"]
+           "get_files_statu", "question_rag_search", "document", "upload_faqs"]
 
 INVALID_USER_ID = f"fail, Invalid user_id: . user_id 必须只含有字母，数字和下划线且字母开头"
 
@@ -627,323 +627,89 @@ async def document(req: request):
         "description": "上传一个FAQ文件到知识库，需要提供知识库的ID和FAQ文件的URL",
     }
 
-* 具体接口使用方式参考README-server.md
-
-# QAnything RAG服务api说明
-
-
-## 接口
-接口列表
-| 接口地址 | 请求类型 | 说明 |
-| ---- | ---- | ---- |
-| [/api/qanything/delete_knowledge_base](#删除知识库) | POST | 删除知识库和文件 |
-| [/api/qanything/document_parser](#解析文件) | POST | 解析文件 |
-| [/api/qanything/document_parser_embedding](#解析文件并存储) | POST | 解析文件并保存 |
-| [/api/qanything/question_rag_search](#问答检索) | POST | 问答接口 |
-| [/api/qanything/get_files_statu](#获取指定文件状态) | POST | 获取指定文件状态 |
-| [/api/qanything/upload_faqs](#上传faq) | POST | 上传FAQ |
-
-
-
-
-### 删除知识库
-
-* 请求参数和示例
-
-| 参数名 | 类型 | 是否必须 | 说明 |
-| --- | --- | --- | --- |
-| user_id | string | 是 | 用户id |
-| kb_id   | string | 是 | 需要删除的知识库id |
-| file_ids| []string | 否 | 需要删除的知识库中文件id，不输入则删除该知识库下所有文件 |
-
-```
-    curl -X POST -H "Content-Type: application/json" http://ip:port/api/qanything/delete_knowledge_base \
-    -d '{"user_id": "123456", "kb_id": "KB123456789"}'
-```
-
-返回结果
-
-| 参数名 | 类型 | 说明 |
-| ----- | --- | --- |
-| code | int    | 200表示成功，其他表示失败 |
-| msg  | string | 返回结果说明 |
-
-
-```
-{
-    "code":200,
-    "msg":"Knowledge Base KB6dae785cdd5d47a997e890521acbe1c5 delete success"}
-```
-
-code其他情况说明
-| code参数名值 | 说明 |
-| ---- | --- |
-| 200  | 成功 |
-| 2002 | 未输入user_id |
-| 2005 | 输入user_id不可用 |
-| 2003 | kb_id未找到 |
-
-
-
-
-
-### 获取指定文件状态
-
-* 请求参数和示例
-
-| 参数名 | 类型 | 是否必须 | 说明 |
-| --- | --- | --- | --- |
-| user_id | string | 是 | 用户id |
-| kb_id   | string | 是 | 需要获取知识库文件列表的知识库id |
-| file_ids   | []string | 是 | 文件列表的文件id |
-
-```
-    curl -X POST -H "Content-Type: application/json" http://ip:port/api/qanything/list_files \
-    -d '{"user_id": "123456", "kb_id": "KB123456789", file_ids: ["123", "124"]}'
-```
-
-* 返回结果
-
-| 参数名 | 类型 | 说明 |
-| ----- | --- | --- |
-| code | int    | 200表示成功，其他表示失败 |
-| msg  | string | 返回结果说明 |
-| data | List | 知识库文件列表 |
-
-
-```
-{
-    "code":200,
-    "msg":"success",
-    "data":{
-        "total":{"green":2},
-        "details":[
-            {
-                "file_id":"123",
-                "file_name":"\u6d4b\u8bd5langchain.docx",
-                "status":"green",
-                "bytes":4174317,
-                "content_length":1556,
-                "timestamp":"202406121611",
-                "msg":"\u4e0a\u4f20\u6210\u529f"
-            },{
-                "file_id":"124",
-                "file_name":"repiBench.pdf",
-                "status":"green",
-                "bytes":2614844,
-                "content_length":72019,
-                "timestamp":"202406121655",
-                "msg":"\u4e0a\u4f20\u6210\u529f"
-            }
-        ]
-    }
-}
-```
-
-
-
-### 解析文件
-
-* 请求参数和示例
-
-| 参数名 | 类型 | 是否必须 | 说明 |
-| --- | --- | --- | --- |
-| user_id | string | 是 | 用户id |
-| files | 文件 | 是 | 待解析文档，只能上传一个，[('file', open('/home/darren/文档/repiBench.pdf','rb'))] |
-
-```
-curl -X POST "http://<your_host>:<your_port>/api/qanything/document_parser"  -d '{"user_id": "zzp"}' -F "file=@/home/darren/文档/repiBench.pdf"
-```
-
-* 返回结果
-
-| 参数名 | 类型 | 说明 |
-| ----- | --- | --- |
-| code | int    | 200表示成功，其他表示失败 |
-| msg  | string | 返回结果说明 |
-| parser_documents | List | 知识库文件列表 |
-
-
-```
-{
-    "code":200,
-    "msg":"document parser success",
-    "parser_documents":[
-        {
-            "metadata":{
-                "user_id":"zzp",
-                "kb_id":"kb_id",
-                "file_id":"file_id",
-                "file_name":"repiBench.pdf",
-                "chunk_id":0,
-                "file_path":"/home/darren/code/QAnything/QANY_DB/content/zzp/file_id/repiBench.pdf",
-                "faq_dict":{}
-            },
-            "page_content":"RepoBench: Benchmarking Repository-Level Code\nAuto-Completion ........ McAuley\nUniversity of California."
-        }
-    ]
-}
-```
-
-
-
-
-
-
-### 解析文件并存储
-
-* 请求参数和示例
-
-| 参数名 | 类型 | 是否必须 | 说明 |
-| --- | --- | --- | --- |
-| user_id | string | 是 | 用户id |
-| kb_id   | string | 是 | 知识库id |
-| file_ids| string | 是 | 文件id列表，与files中文件顺序相同,多个文件id中间用逗号隔开 |
-| mode    | string | 否 | "soft"代表不上传同名文件，"strong"表示强制上传同名文件，默认"soft" |
-| files | 文件 | 是 | 待解析文档，支持上传多个，[('files', open('/home/darren/文档/repiBench.pdf','rb')),] |
-
-```
-curl -X POST "http://<your_host>:<your_port>/api/qanything/document_parser_embedding"  -d '{"user_id": "zzp", "kb_id":"kb_id", "file_ids":"file_id1,file_id2", "mode":"soft"}' -F "files=@/home/darren/文档/repiBench.pdf" -F "files=@/home/darren/文档/repiBench2.pdf"
-```
-
-* 返回结果
-
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| code | int | 200表示成功，其他表示失败 |
-| msg | string | 返回结果说明 |
-| data | List | 每个文件的保存详细情况，其中，status表示文件的处理状态，gray表示后台处理中，还未处理完成（可能出现处理失败的情况，需要后台自行查询） |
-
-
-```
-{
-    "code":200,
-    "msg":"success\uff0c\u540e\u53f0\u6b63\u5728\u98de\u901f\u4e0a\u4f20\u6587\u4ef6\uff0c\u8bf7\u8010\u5fc3\u7b49\u5f85",
-    "data":[
-        {
-            "file_id":"124",
-            "file_name":"repiBench.pdf",
-            "status":"gray",
-            "bytes":2614844,
-            "timestamp":"202406121655"
-        }
-    ]
-}
-```
-
-
-
-
-
-### 问答检索
-
-* 请求参数和示例
-
-| 参数名 | 类型 | 是否必须 | 说明 |
-| --- | --- | --- | --- |
-| user_id | string | 是 | 用户id |
-| kb_ids  | []string | 是 | 检索的知识库id列表 |
-| question| string | 是 | 待检索问题 |
-
-```
-    curl -X POST -H "Content-Type: application/json" http://ip:port/api/qanything/question_rag_search \
-    -d '{"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c5", "question": "python document"}'
-```
-
-返回结果
-
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| code | int | 200表示成功，其他表示失败 |
-| msg | string | 返回结果说明 |
-| question | string | 检索问题 |
-| retrieval_documents | List | 检索结果 |
-
-
-```
-{
-    "code": 0,
-    "msg": "success",
-    "question": "xxxx",
-    "retrieval_documents": [
-        {
-            "metadata": {
-                "user_id":"zzp",
-                "kb_id":"KB6dae785cdd5d47a997e890521acbe1c5",
-                "file_id":"123",
-                "file_name":"\u6d4b\u8bd5langchain.docx",
-                "chunk_id":5,
-                "file_path":"/home/darren/code/QAnything/QANY_DB/content/zzp/123/\u6d4b\u8bd5langchain.docx",
-                "faq_dict":{},
-                "score":0.480712890625,
-                "retrieval_query":"python document",
-                "embed_version":"local_v0.0.1_20230525_6d4019f1559aef84abc2ab8257e1ad4c"
-            },
-            "page_content": "sadfasdf",
-        },
-        {
-            "metadata": {
-
-            },
-            "page_content": "xxxx2",
-        }
-    ]
-}
-```
-    
-
-
-
-
-### 上传FAQ
-
-* 请求参数和示例
-
-| 参数名 | 类型 | 是否必须 | 说明 |
-| --- | --- | --- | --- |
-| user_id | string | 是 | 用户id |
-| kb_id   | string | 是 | 知识库id |
-| faqs | list | 是 | 格式：[{"question": "xxxx", "answer": "xxx"}, ...,{"question": "xxx", "answer": "xxx"}],单次最大支持1000条上传 |
-| --question | string | 是 | 问题 |
-| --answer | string | 是 | 回答 |
-
-
-*  返回结果
-
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| code | int | 200表示成功，其他表示失败 |
-| msg | string | 返回结果说明 |
-| data | List | 每个上传QA对的状态 |
-
-
-```
-{
-    "code":200,
-    "msg":"success\uff0c\u540e\u53f0\u6b63\u5728\u98de\u901f\u4e0a\u4f20\u6587\u4ef6\uff0c\u8bf7\u8010\u5fc3\u7b49\u5f85",
-    "file_status":{},
-    "data":[
-        {
-            "file_id":"319e2082f5e345eb825e4387003321bf",
-            "file_name":"FAQ_\u5982\u4f55\u4f7f\u7528python.faq",
-            "status":"gray",
-            "length":94,
-            "timestamp":"202406121756"
-        },{
-            "file_id":"66a71bc57eee49b2a4b61b8448bc4f18",
-            "file_name":"FAQ_\u5982\u4f55\u4f7f\u7528docker.faq",
-            "status":"gray",
-            "length":85,
-            "timestamp":"202406121756"
-        }
-    ]
-}
-
-```
-
 """
 
     return sanic_text(description)
     
     # html_str = markdown.markdown(description)    
     # return sanic_text(html_str)
+
+
+async def upload_faqs(req: request):
+    local_doc_search: LocalDocSearch = req.app.ctx.local_doc_search
+    user_id = safe_get(req, 'user_id')
+    if user_id is None:
+        return sanic_json({"code": 2002, "msg": f'输入非法！request.json：{req.json}，请检查！'})
+    is_valid = validate_user_id(user_id)
+    if not is_valid:
+        return sanic_json({"code": 2005, "msg": get_invalid_user_id_msg(user_id=user_id)})
+    debug_logger.info("upload_faqs %s", user_id)
+    kb_id = safe_get(req, 'kb_id')
+    debug_logger.info("kb_id %s", kb_id)
+    faqs = safe_get(req, 'faqs')
+    file_status = {}
+    if faqs is None:
+        files = req.files.getlist('files')
+        faqs = []
+        for file in files:
+            debug_logger.info('ori name: %s', file.name)
+            file_name = urllib.parse.unquote(file.name, encoding='UTF-8')
+            debug_logger.info('decode name: %s', file_name)
+            # 删除掉全角字符
+            file_name = re.sub(r'[\uFF01-\uFF5E\u3000-\u303F]', '', file_name)
+            file_name = file_name.replace("/", "_")
+            debug_logger.info('cleaned name: %s', file_name)
+            file_name = truncate_filename(file_name)
+            file_faqs = check_and_transform_excel(file.body)
+            if isinstance(file_faqs, str):
+                file_status[file_name] = file_faqs
+            else:
+                faqs.extend(file_faqs)
+                file_status[file_name] = "success"
+
+    if len(faqs) > 1000:
+        return sanic_json({"code": 2002, "msg": f"fail, faqs too many, The maximum length of each request is 1000."})
+
+    not_exist_kb_ids = local_doc_search.milvus_summary.check_kb_exist(user_id, [kb_id])
+    if not_exist_kb_ids:
+        msg = "invalid kb_id: {}, please check...".format(not_exist_kb_ids)
+        return sanic_json({"code": 2001, "msg": msg})
+
+    data = []
+    now = datetime.now()
+    local_files = []
+    timestamp = now.strftime("%Y%m%d%H%M")
+    debug_logger.info(f"start insert {len(faqs)} faqs to mysql, user_id: {user_id}, kb_id: {kb_id}")
+    debug_logger.info(f"faqs: {faqs}")
+    exist_questions = []
+    for faq in tqdm(faqs):
+        ques = faq['question']
+        if ques not in exist_questions:
+            exist_questions.append(ques)
+        else:
+            debug_logger.info(f"question {ques} already exists, skip it")
+            continue
+        if len(ques) > 512 or len(faq['answer']) > 2048:
+            return sanic_json(
+                {"code": 2003, "msg": f"fail, faq too long, max length of question is 512, answer is 2048."})
+        content_length = len(ques) + len(faq['answer'])
+        file_name = f"FAQ_{ques}.faq"
+        file_name = file_name.replace("/", "_").replace(":", "_")  # 文件名中的/和：会导致写入时出错
+        file_name = simplify_filename(file_name)
+        file_id, msg = local_doc_search.milvus_summary.add_file(user_id, kb_id, file_name, timestamp, status='green')
+        debug_logger.info('file_name:{}'.format(file_name))
+        debug_logger.info('file_id:{}'.format(file_id))
+        local_file = LocalFile(user_id, kb_id, faq, file_id, file_name, local_doc_search.embeddings)
+        local_doc_search.milvus_summary.update_file_path(file_id, local_file.file_path)
+        local_files.append(local_file)
+        local_doc_search.milvus_summary.add_faq(file_id, user_id, kb_id, ques, faq['answer'], faq.get("nos_keys", ""))
+        # debug_logger.info(f"{file_name}, {file_id}, {msg}, {faq}")
+        data.append(
+            {"file_id": file_id, "file_name": file_name, "status": "gray", "length": content_length,
+             "timestamp": timestamp})
+    debug_logger.info(f"end insert {len(faqs)} faqs to mysql, user_id: {user_id}, kb_id: {kb_id}")
+
+    asyncio.create_task(local_doc_search.insert_files_to_milvus(user_id, kb_id, local_files))
+
+    msg = "success，后台正在飞速上传文件，请耐心等待"
+    return sanic_json({"code": 200, "msg": msg, "file_status": file_status, "data": data})

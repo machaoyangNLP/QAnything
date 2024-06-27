@@ -102,7 +102,8 @@ app.add_route(document_parser_embedding, "/api/qanything/document_parser_embeddi
 app.add_route(chunk_embedding, "/api/qanything/chunk_embedding", methods=['POST'])  # tags=["切片数据保存"]
 app.add_route(question_rag_search, "/api/qanything/question_rag_search", methods=['POST'])  # tags=["问答接口"]
 app.add_route(get_files_statu, "/api/qanything/get_files_statu", methods=['POST'])  # tags=["获取指定文件状态"]
+app.add_route(upload_faqs, "/api/qanything/upload_faqs", methods=['POST'])  # tags=["上传FAQ"]
 
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8777, workers=10, access_log=False)
+    app.run(host='0.0.0.0', port=8666, workers=10, access_log=False)

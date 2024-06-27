@@ -96,7 +96,8 @@ echo "GPU ID: $gpu_id1, $gpu_id2, device_id: $device_id"
 start_time=$(date +%s)  # 记录开始时间
 
 # 如果是nvidia显卡，则使用tritonserver
-if [ "$device"=="cuda"]; then
+if [[ "$device" == "cuda" ]]; then
+  echo "使用nvidia gpu"
   CUDA_VISIBLE_DEVICES=$gpu_id1 nohup /opt/tritonserver/bin/tritonserver --model-store=/workspace/qanything_local/model --http-port=9000 --grpc-port=9001 --metrics-port=9002 --log-verbose=1 > /workspace/qanything_local/logs/debug_logs/embed_rerank_tritonserver.log 2>&1 &
   update_or_append_to_env "RERANK_PORT" "9001"
   update_or_append_to_env "EMBED_PORT" "9001"
@@ -107,12 +108,12 @@ if [ "$device"=="cuda"]; then
   echo "rerank服务已就绪! (1/4)"
 fi
 
-
+cd /workspace/qanything_local || exit
 nohup python3 -u qanything_kernel/dependent_server/ocr_serve/ocr_server.py > /workspace/qanything_local/logs/debug_logs/ocr_server.log 2>&1 &
 echo "The ocr service is ready! (2/4)"
 echo "OCR服务已就绪! (2/4)"
 
-nohup python3 -u qanything_kernel/qanything_server/sanic_api_search.py --mode "local" > /workspace/qanything_local/logs/debug_logs/sanic_api_search.log 2>&1 &
+nohup python3 -u qanything_kernel/qanything_server/sanic_api_search.py --mode "local" --device $device --device_id $device_id > /workspace/qanything_local/logs/debug_logs/sanic_api_search.log 2>&1 &
 
 # 监听后端服务启动
 backend_start_time=$(date +%s)
@@ -139,13 +140,11 @@ echo "The qanything backend service is ready! (3/4)"
 echo "qanything后端服务已就绪! (3/4)"
 
 
+if [[ "$device" == "cuda" ]]; then
+  embed_rerank_log_file="/workspace/qanything_local/logs/debug_logs/embed_rerank_tritonserver.log"
+  tail -f $embed_rerank_log_file &  # 后台输出日志文件
+  tail_pid=$!  # 获取tail命令的进程ID
 
-embed_rerank_log_file="/workspace/qanything_local/logs/debug_logs/embed_rerank_tritonserver.log"
-tail -f $embed_rerank_log_file &  # 后台输出日志文件
-tail_pid=$!  # 获取tail命令的进程ID
-
-
-if [ "$device"=="cuda"]; then
   now_time=$(date +%s)
   while true; do
       current_time=$(date +%s)

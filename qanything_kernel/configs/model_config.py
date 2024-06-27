@@ -116,9 +116,11 @@ LOCAL_EMBED_BATCH = 16
 
 
 LOCAL_RERANK_WORKERS=8
-LOCAL_RERANK_PATH = os.path.join(root_path, 'qanything_kernel/connector/rerank', 'rerank_model_configs_v0.0.1')
+LOCAL_RERANK_PATH = os.path.join(root_path, 'model', 'bce-reranker-base_v1')
+# LOCAL_RERANK_PATH = os.path.join(root_path, 'qanything_kernel/connector/rerank', 'rerank_model_configs_v0.0.1')
 LOCAL_RERANK_MODEL_PATH = os.path.join(LOCAL_RERANK_PATH, "rerank.onnx")
 
 LOCAL_EMBED_WORKERS=8
-LOCAL_EMBED_PATH = os.path.join(root_path, 'qanything_kernel/connector/embedding', 'embedding_model_configs_v0.0.1')
+LOCAL_EMBED_PATH = os.path.join(root_path, 'model', 'bce-embedding-base_v1')
+# LOCAL_EMBED_PATH = os.path.join(root_path, 'qanything_kernel/connector/embedding', 'embedding_model_configs_v0.0.1')
 LOCAL_EMBED_MODEL_PATH = os.path.join(LOCAL_EMBED_PATH, "embed.onnx")
