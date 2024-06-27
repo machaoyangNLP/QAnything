@@ -2,7 +2,10 @@ import os
 import logging
 import uuid
 from dotenv import load_dotenv
+import platform
+
 load_dotenv()
+os_system = platform.system()
 
 # LOG_FORMAT = "%(levelname) -5s %(asctime)s" "-1d: %(message)s"
 # logger = logging.getLogger()
@@ -109,3 +112,13 @@ LOCAL_EMBED_SERVICE_URL = f"localhost:{embed_port}"
 LOCAL_EMBED_MODEL_NAME = 'embed'
 LOCAL_EMBED_MAX_LENGTH = 512
 LOCAL_EMBED_BATCH = 16
+
+
+
+LOCAL_RERANK_WORKERS=8
+LOCAL_RERANK_PATH = os.path.join(root_path, 'qanything_kernel/connector/rerank', 'rerank_model_configs_v0.0.1')
+LOCAL_RERANK_MODEL_PATH = os.path.join(LOCAL_RERANK_PATH, "rerank.onnx")
+
+LOCAL_EMBED_WORKERS=8
+LOCAL_EMBED_PATH = os.path.join(root_path, 'qanything_kernel/connector/embedding', 'embedding_model_configs_v0.0.1')
+LOCAL_EMBED_MODEL_PATH = os.path.join(LOCAL_EMBED_PATH, "embed.onnx")
