@@ -40,7 +40,7 @@ class EmbeddingBackend(Embeddings):
         pass
 
     @get_time
-    def get_len_safe_embeddings(self, texts: List[str]) -> List[List[float]]:
+    def _get_len_safe_embeddings(self, texts: List[str]) -> List[List[float]]:
         all_embeddings = []
         batch_size = LOCAL_EMBED_BATCH
 
@@ -58,7 +58,7 @@ class EmbeddingBackend(Embeddings):
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         """Embed search docs using multithreading, maintaining the original order."""
-        return self.get_len_safe_embeddings(texts)
+        return self._get_len_safe_embeddings(texts)
 
     def embed_query(self, text: str) -> List[float]:
         """Embed query text."""

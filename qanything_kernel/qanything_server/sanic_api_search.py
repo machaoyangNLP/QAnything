@@ -19,7 +19,7 @@ sys.path.append(root_dir)
 
 from qanything_kernel.qanything_server.handler_search import *
 # from qanything_kernel.core.local_doc_search_cpu import LocalDocSearch
-from qanything_kernel.core.local_doc_search_npu import LocalDocSearch
+from qanything_kernel.core.local_doc_search import LocalDocSearch
 from sanic import Sanic
 from sanic import response as sanic_response
 import argparse
@@ -32,8 +32,10 @@ parser = argparse.ArgumentParser()
 # mode必须是local或online
 parser.add_argument('--mode', type=str, default='local', help='local or online')
 parser.add_argument('--use_cpu', type=bool, default=False, help='use cpu or npu')
-parser.add_argument('--device', type=str, default='cpu', help='device')
+parser.add_argument('--device', type=str, default='cpu', help='device [cpu,gpu,npu]')
 parser.add_argument('--device_id', type=str, default='0', help='device id')
+parser.add_argument('--port', type=int, default=8777, help='qanything server port')
+parser.add_argument('--workers', type=int, default=10, help='number of workers')
 
 # parser.add_argument('--rerank_model_path', type=str, help='rerank model path')
 # parser.add_argument('--embedding_model_path', type=str, help='embedding model path')
@@ -106,4 +108,4 @@ app.add_route(upload_faqs, "/api/qanything/upload_faqs", methods=['POST'])  # ta
 
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8666, workers=10, access_log=False)
+    app.run(host='0.0.0.0', port=args.port, workers=args.workers, access_log=False)

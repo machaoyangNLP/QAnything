@@ -1,8 +1,6 @@
 from qanything_kernel.configs.model_config import VECTOR_SEARCH_TOP_K, CHUNK_SIZE, VECTOR_SEARCH_SCORE_THRESHOLD, \
     PROMPT_TEMPLATE, STREAMING
 from typing import List
-from qanything_kernel.connector.embedding.embedding_for_online import YouDaoEmbeddings
-from qanything_kernel.connector.embedding.embedding_for_local import YouDaoLocalEmbeddings
 from langchain.schema import Document
 from qanything_kernel.connector.database.mysql.mysql_client import KnowledgeBaseManager
 from qanything_kernel.connector.database.milvus.milvus_client import MilvusClient
@@ -16,18 +14,13 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 
-def _embeddings_hash(self):
-    return hash(self.model_name)
-
-
-YouDaoLocalEmbeddings.__hash__ = _embeddings_hash
-YouDaoEmbeddings.__hash__ = _embeddings_hash
 
 
 class LocalDocSearch:
     def __init__(self):
         # self.llm: object = None
         self.embeddings: object = None
+        self.local_rerank_backend: object = None
         self.top_k: int = VECTOR_SEARCH_TOP_K
         self.chunk_size: int = CHUNK_SIZE
         self.chunk_conent: bool = True
@@ -35,6 +28,7 @@ class LocalDocSearch:
         self.milvus_kbs: List[MilvusClient] = []
         self.milvus_summary: KnowledgeBaseManager = None
         self.mode: str = None
+        self.run_mode: str = "cpu"
         self.local_rerank_service_url = "http://0.0.0.0:8776"
         self.ocr_url = 'http://0.0.0.0:8010/ocr'
 
@@ -45,9 +39,31 @@ class LocalDocSearch:
 
     def init_cfg(self, args):
         self.mode = args.mode
-        self.embeddings = YouDaoLocalEmbeddings()
-        self.milvus_summary = KnowledgeBaseManager(self.mode)
+        self.run_mode = args.device
+        if self.run_mode == "cpu":
+            from qanything_kernel.connector.rerank.rerank_onnx_backend import RerankOnnxBackend
+            from qanything_kernel.connector.embedding.embedding_onnx_backend import EmbeddingOnnxBackend
+            self.local_rerank_backend: RerankOnnxBackend = RerankOnnxBackend(use_cpu=True)
+            self.embeddings: EmbeddingOnnxBackend = EmbeddingOnnxBackend(use_cpu=True)
+        elif self.run_mode == "gpu":
+            from qanything_kernel.connector.embedding.embedding_for_online import YouDaoEmbeddings
+            from qanything_kernel.connector.embedding.embedding_for_local import YouDaoLocalEmbeddings            
 
+            def _embeddings_hash(self):
+                return hash(self.model_name)
+            YouDaoLocalEmbeddings.__hash__ = _embeddings_hash
+            YouDaoEmbeddings.__hash__ = _embeddings_hash
+            self.embeddings = YouDaoLocalEmbeddings()
+        elif self.run_mode == "npu":
+            from qanything_kernel.connector.rerank.rerank_torch_backend import RerankTorchBackend
+            from qanything_kernel.connector.embedding.embedding_torch_backend import EmbeddingTorchBackend
+            self.local_rerank_backend: RerankTorchBackend = RerankTorchBackend(use_cpu=False, device=args.device+":"+str(args.device_id))
+            self.embeddings: EmbeddingTorchBackend = EmbeddingTorchBackend(use_cpu=False, device=args.device+":"+str(args.device_id))
+        else:
+            debug_logger.error("input model device error")
+            raise InterruptedError("input model device error")
+        self.milvus_summary = KnowledgeBaseManager(self.mode)
+        
     def create_milvus_collection(self, user_id, kb_id, kb_name):
         milvus_kb = MilvusClient(self.mode, user_id, [kb_id])
         self.milvus_kbs.append(milvus_kb)
@@ -131,7 +147,10 @@ class LocalDocSearch:
         for query, query_docs in zip(queries, batch_result):
             for doc in query_docs:
                 doc.metadata['retrieval_query'] = query  # 添加查询到文档的元数据中
-                doc.metadata['embed_version'] = self.embeddings.embed_version
+                if self.run_mode=="cpu":
+                    doc.metadata['embed_version'] = self.embeddings.getModelVersion
+                else:
+                    doc.metadata['embed_version'] = self.embeddings.embed_version
                 source_documents.append(doc)
         if cosine_thresh:
             source_documents = [item for item in source_documents if float(item.metadata['score']) > cosine_thresh]
@@ -153,8 +172,14 @@ class LocalDocSearch:
 
         source_documents_reranked = []
         try:
-            response = requests.post(f"{self.local_rerank_service_url}/rerank",
+            if self.run_mode=="gpu":
+                response = requests.post(f"{self.local_rerank_service_url}/rerank",
                                      json={"passages": [doc.page_content for doc in source_documents], "query": query}, timeout=60)
+            else:
+                response = self.local_rerank_backend.predict(query, [doc.page_content for doc in source_documents])
+            
+            debug_logger.info(f"rerank scores: {response}")
+            
             scores = response.json()
             for idx, score in enumerate(scores):
                 source_documents[idx].metadata['score'] = score

@@ -126,7 +126,8 @@ class LocalDocSearch:
         if not top_k:
             top_k = self.top_k
         source_documents = []
-        embs = self.embeddings.aembed_documents(queries)        
+        embs = self.embeddings._get_len_safe_embeddings(queries)
+        # embs = self.embeddings.aembed_documents(queries)        
 
         t1 = time.time()
         batch_result = milvus_kb.search_emb_async(embs=embs, top_k=top_k, queries=queries)

@@ -45,60 +45,71 @@ script_name=$(basename "$0")
 
 usage() {
   echo "Usage: $script_name [-d device] [-i <device_id>] [-h]"
-  echo "  -d <device>: Specify argument [cpu、cuda、npu]"
+  echo "  -d <device>: Specify argument [cpu、gpu、npu]"
   echo "  -i <device_id>: Specify argument GPU device_id"
+  echo "  -p <qanything_port>: qanything server port"
+  echo "  -w <server_workers>: qanything server workers"
   echo "  -h: Display help usage message"
   exit 1
 }
 
 device="cpu"
 device_id="0"
+port="8777"
+workers=10
 
 # 解析命令行参数
-while getopts ":d:i:h" opt; do
+while getopts ":d:i:p:w:h" opt; do
   case $opt in
     d) device=$OPTARG ;;
     i) device_id=$OPTARG ;;
+    p) port=$OPTARG ;;
+    w) workers=$OPTARG ;;
     h) usage ;;
     *) usage ;;
   esac
 done
 
-echo "device is set to [$device]"
-echo "device_id is set to [$device_id]"
+
 
 
 
 cd /workspace/qanything_local
 
-# 设置默认值
-default_gpu_id1=0
-default_gpu_id2=0
-
-# 检查环境变量GPUID1是否存在，并读取其值或使用默认值
-if [ -z "${GPUID1}" ]; then
-    gpu_id1=$default_gpu_id1
+source .env
+# 检查环境变量DEVICE_ID是否存在，并读取其值或使用默认值
+if [ -z "${DEVICE_ID}" ]; then
+    echo "device_id 使用默认id"
 else
-    gpu_id1=${GPUID1}
+    device_id=${DEVICE_ID}
 fi
 
-# 检查环境变量GPUID2是否存在，并读取其值或使用默认值
-if [ -z "${GPUID2}" ]; then
-    gpu_id2=$default_gpu_id2
+if [ -z "${QANYTHING_PORT}" ]; then
+    echo "QANYTHING_PORT 使用默认port"
 else
-    gpu_id2=${GPUID2}
+    port=${QANYTHING_PORT}
 fi
-echo "GPU ID: $gpu_id1, $gpu_id2, device_id: $device_id"
 
+if [ -z "${WORKERS}" ]; then
+    echo "WORKERS 使用默认值"
+else
+    workers=${WORKERS}
+fi
+
+
+echo "device is set to [$device]"
+echo "device_id is set to [$device_id]"
+echo "port: $port"
+echo "workers: $workers"
 
 
 
 start_time=$(date +%s)  # 记录开始时间
 
 # 如果是nvidia显卡，则使用tritonserver
-if [[ "$device" == "cuda" ]]; then
+if [[ "$device" == "gpu" ]]; then
   echo "使用nvidia gpu"
-  CUDA_VISIBLE_DEVICES=$gpu_id1 nohup /opt/tritonserver/bin/tritonserver --model-store=/workspace/qanything_local/model --http-port=9000 --grpc-port=9001 --metrics-port=9002 --log-verbose=1 > /workspace/qanything_local/logs/debug_logs/embed_rerank_tritonserver.log 2>&1 &
+  CUDA_VISIBLE_DEVICES=$device_id nohup /opt/tritonserver/bin/tritonserver --model-store=/workspace/qanything_local/model --http-port=9000 --grpc-port=9001 --metrics-port=9002 --log-verbose=1 > /workspace/qanything_local/logs/debug_logs/embed_rerank_tritonserver.log 2>&1 &
   update_or_append_to_env "RERANK_PORT" "9001"
   update_or_append_to_env "EMBED_PORT" "9001"
 
@@ -113,7 +124,7 @@ nohup python3 -u qanything_kernel/dependent_server/ocr_serve/ocr_server.py > /wo
 echo "The ocr service is ready! (2/4)"
 echo "OCR服务已就绪! (2/4)"
 
-nohup python3 -u qanything_kernel/qanything_server/sanic_api_search.py --mode "local" --device $device --device_id $device_id > /workspace/qanything_local/logs/debug_logs/sanic_api_search.log 2>&1 &
+nohup python3 -u qanything_kernel/qanything_server/sanic_api_search.py --mode "local" --device $device --device_id $device_id --port $port --workers $workers > /workspace/qanything_local/logs/debug_logs/sanic_api_search.log 2>&1 &
 
 # 监听后端服务启动
 backend_start_time=$(date +%s)
@@ -140,7 +151,7 @@ echo "The qanything backend service is ready! (3/4)"
 echo "qanything后端服务已就绪! (3/4)"
 
 
-if [[ "$device" == "cuda" ]]; then
+if [[ "$device" == "gpu" ]]; then
   embed_rerank_log_file="/workspace/qanything_local/logs/debug_logs/embed_rerank_tritonserver.log"
   tail -f $embed_rerank_log_file &  # 后台输出日志文件
   tail_pid=$!  # 获取tail命令的进程ID
@@ -190,7 +201,7 @@ elapsed=$((current_time - start_time))  # 计算经过的时间（秒）
 echo "Time elapsed: ${elapsed} seconds."
 echo "已耗时: ${elapsed} 秒."
 user_ip=$USER_IP
-echo "请在[http://$user_ip:8777/api/docs]下访问前端服务获取当前后端API文档说明"
+echo "请在[http://$user_ip:$port/api/docs]下访问前端服务获取当前后端API文档说明"
 
 # 保持容器运行
 while true; do

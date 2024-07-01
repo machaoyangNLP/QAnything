@@ -132,11 +132,11 @@ class LocalDocSearch:
         if not top_k:
             top_k = self.top_k
         source_documents = []
-        # embs = self.embeddings._get_len_safe_embeddings(queries)
-        if self.use_cpu:
-            embs = self.embeddings.aembed_documents(queries)
-        else:
-            embs = self.embeddings._get_len_safe_embeddings(queries)
+        embs = self.embeddings._get_len_safe_embeddings(queries)
+        # if self.use_cpu:
+        #     embs = self.embeddings.aembed_documents(queries)
+        # else:
+        #     embs = self.embeddings._get_len_safe_embeddings(queries)
             
         
 

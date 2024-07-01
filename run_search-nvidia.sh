@@ -30,8 +30,10 @@ script_name=$(basename "$0")
 
 usage() {
   echo "Usage: $script_name [-i <device_id>] [-h]"
-  echo "  -d : device, '[cpu,cuda,npu]'"
+  echo "  -d : device, '[cpu,gpu,npu]'"
   echo "  -i <device_id>: Specify argument GPU device_id"
+  echo "  -p <qanything_port>: qanything server port"
+  echo "  -w <server_workers>: qanything server workers"
   echo "  -h: Display help usage message. For more information, please refer to docs/QAnything_Startup_Usage_README.md"
   exit 1
 }
@@ -41,12 +43,16 @@ usage() {
 
 device="cuda"
 device_id="0"
+qanything_port="8777"
+workers=10
 
 # 解析命令行参数
-while getopts ":d:i:h" opt; do
+while getopts ":d:i:p:w:h" opt; do
   case $opt in
     d) device=$OPTARG ;;
     i) device_id=$OPTARG ;;
+    p) qanything_port=$OPTARG ;;
+    w) workers=$OPTARG ;;
     h) usage ;;
     *) usage ;;
   esac
@@ -65,23 +71,10 @@ fi
 
 
 
-gpu_id1=0
-gpu_id2=0
-
-# 判断命令行参数
-if [[ -n "$device_id" ]]; then
-    # 如果传入参数，分割成两个GPU ID
-    IFS=',' read -ra gpu_ids <<< "$device_id"
-    gpu_id1=${gpu_ids[0]}
-    gpu_id2=${gpu_ids[1]:-$gpu_id1}  # 如果没有第二个ID，则默认使用第一个ID
-fi
-
-echo "GPUID1=${gpu_id1}, GPUID2=${gpu_id2}, device_id=${device_id}"
-echo "device_id is set to [$device_id]"
-
-update_or_append_to_env "GPUID1" "$gpu_id1"
-update_or_append_to_env "GPUID2" "$gpu_id2"
+update_or_append_to_env "DEVICE" "$device"
 update_or_append_to_env "DEVICE_ID" "$device_id"
+update_or_append_to_env "QANYTHING_PORT" "$qanything_port"
+update_or_append_to_env "WORKERS" "$workers"
 
 # 读取环境变量中的用户信息
 source .env
@@ -92,13 +85,13 @@ update_or_append_to_env "USER_IP" "$ip"
 
 
 echo "Running under native Linux"
-if $DOCKER_COMPOSE_CMD -p user -f docker-compose-linux-search.yaml down |& tee /dev/tty | grep -q "services.qanything_local.deploy.resources.reservations value 'devices' does not match any of the regexes"; then
+if $DOCKER_COMPOSE_CMD -p user -f docker-compose-linux-search-nvidia.yaml down |& tee /dev/tty | grep -q "services.qanything_local.deploy.resources.reservations value 'devices' does not match any of the regexes"; then
     echo "检测到 Docker Compose 版本过低，请升级到v2.23.3或更高版本。执行docker-compose -v查看版本。"
 fi
 mkdir -p volumes/es/data
 chmod 777 -R volumes/es/data
-$DOCKER_COMPOSE_CMD -p user -f docker-compose-linux-search.yaml up -d
-$DOCKER_COMPOSE_CMD -p user -f docker-compose-linux-search.yaml logs -f qanything_local
+$DOCKER_COMPOSE_CMD -p user -f docker-compose-linux-search-nvidia.yaml up -d
+$DOCKER_COMPOSE_CMD -p user -f docker-compose-linux-search-nvidia.yaml logs -f qanything_local
 # 检查日志输出
 
 

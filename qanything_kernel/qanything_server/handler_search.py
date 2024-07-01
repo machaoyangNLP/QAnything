@@ -1,6 +1,7 @@
 from qanything_kernel.core.local_file import LocalFile
 # from qanything_kernel.core.local_doc_search_cpu import LocalDocSearch
-from qanything_kernel.core.local_doc_search_npu import LocalDocSearch
+# from qanything_kernel.core.local_doc_search_npu import LocalDocSearch
+from qanything_kernel.core.local_doc_search import LocalDocSearch
 from qanything_kernel.utils.general_utils import *
 from qanything_kernel.utils.custom_log import debug_logger, qa_logger
 from sanic.response import ResponseStream
